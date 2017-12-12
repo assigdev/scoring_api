@@ -3,7 +3,9 @@
 ### Установка
 
 Клонируем
+
 *git clone https://github.com/assigdev/scoring_api.git*
+
 Для работы скрипта достатоточно стандартной библиотеки, Python 2.
 
 ### Запуск

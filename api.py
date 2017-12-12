@@ -39,6 +39,7 @@ GENDERS = {
 
 
 class BaseField(object):
+    __metaclass__ = abc.ABCMeta
     require_error = "is require"
     nullable_error = "is not nullable"
     value = None
@@ -73,10 +74,11 @@ class BaseField(object):
         elif not self.value:
             self.clean_nullable()
         else:
-            for attr_name in dir(self):
-                attr = getattr(self, attr_name)
-                if attr_name.startswith('clean_') and attr_name not in ('clean_required', 'clean_nullable'):
-                    attr()
+            self.clean()
+            # for attr_name in dir(self):
+            #     attr = getattr(self, attr_name)
+            #     if attr_name.startswith('clean_') and attr_name not in ('clean_required', 'clean_nullable'):
+            #         attr()
 
     def _restore_errors(self):
         self.errors = []
@@ -89,11 +91,15 @@ class BaseField(object):
         if not self.nullable:
             self.errors.append(self.nullable_error)
 
+    @abc.abstractmethod
+    def clean(self):
+        pass
+
 
 class CharField(BaseField):
     char_error = "Is not a string"
 
-    def clean_char(self):
+    def clean(self):
         if not isinstance(self.value, basestring):
             self.errors.append(self.char_error)
 
@@ -101,7 +107,7 @@ class CharField(BaseField):
 class ArgumentsField(BaseField):
     arguments_error = 'Is not dict with arguments'
 
-    def clean_arguments(self):
+    def clean(self):
         if not isinstance(self.value, dict):
             self.errors.append(self.arguments_error)
 
@@ -109,16 +115,18 @@ class ArgumentsField(BaseField):
 class EmailField(CharField):
     email_error = "Is not email"
 
-    def clean_email(self):
-        if '@' not in self.value:
-            self.errors.append(self.email_error)
+    def clean(self):
+        super(EmailField, self).clean()
+        if isinstance(self.value, basestring):
+            if '@' not in self.value:
+                self.errors.append(self.email_error)
 
 
 class PhoneField(BaseField):
     phone_error = 'Is not phone number'
     phone_template = r"7\d{10}"
 
-    def clean_phone(self):
+    def clean(self):
         if not re.match(self.phone_template, self.value):
             self.errors.append(self.phone_error)
 
@@ -126,7 +134,7 @@ class PhoneField(BaseField):
 class DateField(BaseField):
     data_error = 'Is note date'
 
-    def clean_date(self):
+    def clean(self):
         try:
             datetime.datetime.strptime(self.value, '%d.%m.%Y')
         except ValueError:
@@ -136,7 +144,8 @@ class DateField(BaseField):
 class BirthDayField(DateField):
     birthday_error = 'Not a birthday'
 
-    def clean_birth_day(self):
+    def clean(self):
+        super(BirthDayField, self).clean()
         try:
             birthday = datetime.datetime.strptime(self.value, '%d.%m.%Y')
             if birthday < datetime.datetime.now() - datetime.timedelta(days=365*70):
@@ -148,7 +157,7 @@ class BirthDayField(DateField):
 class GenderField(BaseField):
     gender_error = 'is not a gender number'
 
-    def clean_gender(self):
+    def clean(self):
         try:
             int(self.value)
         except ValueError:
@@ -160,7 +169,7 @@ class GenderField(BaseField):
 class ClientIDsField(BaseField):
     client_id_error = 'Is not list of client ids'
 
-    def clean_client_ids(self):
+    def clean(self):
         if not isinstance(self.value, list):
             self.errors.append(self.client_id_error)
 

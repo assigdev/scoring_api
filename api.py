@@ -39,7 +39,7 @@ GENDERS = {
 
 
 class BaseField(object):
-    require_error = "is not require"
+    require_error = "is require"
     nullable_error = "is not nullable"
     value = None
     errors = []
@@ -69,11 +69,13 @@ class BaseField(object):
 
     def validate(self):
         if self.value is None:
+            self.clean_required()
+        elif not self.value:
             self.clean_nullable()
         else:
             for attr_name in dir(self):
                 attr = getattr(self, attr_name)
-                if callable(attr) and attr_name.startswith('clean_'):
+                if attr_name.startswith('clean_') and attr_name not in ('clean_required', 'clean_nullable'):
                     attr()
 
     def _restore_errors(self):
@@ -81,11 +83,10 @@ class BaseField(object):
 
     def clean_required(self):
         if self.required:
-            if not (self.value or self.value is None):
-                self.errors.append(self.require_error)
+            self.errors.append(self.require_error)
 
     def clean_nullable(self):
-        if not self.nullable and self.value is None:
+        if not self.nullable:
             self.errors.append(self.nullable_error)
 
 
@@ -394,7 +395,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     op = OptionParser()
-    op.add_option("-p", "--port", action="store", type=int, default=8080)
+    op.add_option("-p", "--port", action="store", type=int, default=8081)
     op.add_option("-l", "--log", action="store", default=None)
     (opts, args) = op.parse_args()
     logging.basicConfig(filename=opts.log, level=logging.INFO,

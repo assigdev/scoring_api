@@ -172,25 +172,24 @@ class ClientIDsField(BaseField):
 
 class BaseRequest(object):
     __metaclass__ = abc.ABCMeta
+    fields_with_validation = []
 
     def __init__(self):
         self.errors = {}
 
     def validate_fields(self):
-        for attr_name in dir(self):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, BaseField):
-                attr.validate()
-                if attr.errors:
-                    self.errors[attr_name] = attr.errors
+        for field_name in self.fields_with_validation:
+            field = getattr(self, field_name)
+            field.validate()
+            if field.errors:
+                self.errors[field_name] = field.errors
 
     def get_data(self):
-        attrs = {}
-        for attr_name in dir(self):
-            attr = getattr(self, attr_name)
-            if isinstance(attr, BaseField):
-                attrs[attr_name] = attr.value
-        return attrs
+        fields = {}
+        for field_name in self.fields_with_validation:
+            field = getattr(self, field_name)
+            fields[field_name] = field.value
+        return fields
 
     def get_errors(self):
         errors_list = []
@@ -208,6 +207,7 @@ class BaseRequest(object):
 class ClientsInterestsRequest(BaseRequest):
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
+    fields_with_validation = ['client_ids', 'date']
 
     def __init__(self, kwargs):
         super(ClientsInterestsRequest, self).__init__()
@@ -233,6 +233,7 @@ class OnlineScoreRequest(BaseRequest):
         ('phone', 'email'),
         ('gender', 'birthday'),
     )
+    fields_with_validation = ['first_name', 'last_name', 'email', 'phone', 'birthday', 'gender']
 
     def __init__(self, kwargs):
         super(OnlineScoreRequest, self).__init__()
@@ -267,6 +268,7 @@ class MethodRequest(BaseRequest):
     token = CharField(required=True, nullable=True)
     arguments = ArgumentsField(required=True, nullable=True)
     method = CharField(required=True, nullable=False)
+    fields_with_validation = ['account', 'login', 'token', 'arguments', 'method']
 
     def __init__(self, kwargs):
         super(MethodRequest, self).__init__()

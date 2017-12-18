@@ -209,10 +209,10 @@ class ClientsInterestsRequest(BaseRequest):
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
-    def __init__(self, client_ids=None, date=None):
+    def __init__(self, kwargs):
         super(ClientsInterestsRequest, self).__init__()
-        self.client_ids = client_ids
-        self.date = date
+        self.client_ids = kwargs.get('client_ids', None)
+        self.date = kwargs.get('date', None)
 
     def is_valid(self):
         self.validate_fields()
@@ -234,14 +234,14 @@ class OnlineScoreRequest(BaseRequest):
         ('gender', 'birthday'),
     )
 
-    def __init__(self, first_name=None, last_name=None, email=None, phone=None, birthday=None, gender=None):
+    def __init__(self, kwargs):
         super(OnlineScoreRequest, self).__init__()
-        self.first_name = first_name
-        self.last_name = last_name
-        self.email = email
-        self.phone = phone
-        self.birthday = birthday
-        self.gender = gender
+        self.first_name = kwargs.get('first_name', None)
+        self.last_name = kwargs.get('last_name', None)
+        self.email = kwargs.get('email', None)
+        self.phone = kwargs.get('phone', None)
+        self.birthday = kwargs.get('birthday', None)
+        self.gender = kwargs.get('gender', None)
         self.not_null_fields = []
 
     def is_valid(self):
@@ -268,13 +268,13 @@ class MethodRequest(BaseRequest):
     arguments = ArgumentsField(required=True, nullable=True)
     method = CharField(required=True, nullable=False)
 
-    def __init__(self, account=None, login=None, token=None, arguments=None, method=None):
+    def __init__(self, kwargs):
         super(MethodRequest, self).__init__()
-        self.account = account
-        self.login = login
-        self.token = token
-        self.arguments = arguments
-        self.method = method
+        self.account = kwargs.get('account', None)
+        self.login = kwargs.get('login', None)
+        self.token = kwargs.get('token', None)
+        self.arguments = kwargs.get('arguments', None)
+        self.method = kwargs.get('method', None)
 
     def is_valid(self):
         self.validate_fields()
@@ -298,7 +298,7 @@ def check_auth(request):
 
 
 def online_score_handler(arguments, is_admin, ctx, store):
-    online_score_request = OnlineScoreRequest(**arguments)
+    online_score_request = OnlineScoreRequest(arguments)
     if is_admin:
         code = OK
         response = {'score': 42}
@@ -315,7 +315,7 @@ def online_score_handler(arguments, is_admin, ctx, store):
 
 
 def clients_interests_handler(arguments, is_admin, ctx, store):
-    clients_interests_request = ClientsInterestsRequest(**arguments)
+    clients_interests_request = ClientsInterestsRequest(arguments)
     if clients_interests_request.is_valid():
         code = OK
         response = {}
@@ -333,7 +333,7 @@ def method_handler(request, ctx, store):
         'clients_interests': clients_interests_handler
     }
     body = request['body']
-    method_request = MethodRequest(**body)
+    method_request = MethodRequest(body)
     if method_request.is_valid():
         if check_auth(method_request):
             if method_request.method.value in handler_router:

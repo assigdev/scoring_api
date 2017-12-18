@@ -75,10 +75,6 @@ class BaseField(object):
             self.clean_nullable()
         else:
             self.clean()
-            # for attr_name in dir(self):
-            #     attr = getattr(self, attr_name)
-            #     if attr_name.startswith('clean_') and attr_name not in ('clean_required', 'clean_nullable'):
-            #         attr()
 
     def _restore_errors(self):
         self.errors = []
@@ -205,7 +201,7 @@ class BaseRequest(object):
         return "; ".join(errors_list) + '.'
 
     @abc.abstractmethod
-    def is_validate(self):
+    def is_valid(self):
         pass
 
 
@@ -218,7 +214,7 @@ class ClientsInterestsRequest(BaseRequest):
         self.client_ids = client_ids
         self.date = date
 
-    def is_validate(self):
+    def is_valid(self):
         self.validate_fields()
         if self.errors:
             return False
@@ -248,7 +244,7 @@ class OnlineScoreRequest(BaseRequest):
         self.gender = gender
         self.not_null_fields = []
 
-    def is_validate(self):
+    def is_valid(self):
         self.validate_fields()
         if self.errors:
             return False
@@ -280,7 +276,7 @@ class MethodRequest(BaseRequest):
         self.arguments = arguments
         self.method = method
 
-    def is_validate(self):
+    def is_valid(self):
         self.validate_fields()
         if self.errors:
             return False
@@ -303,15 +299,14 @@ def check_auth(request):
 
 def online_score_handler(arguments, is_admin, ctx, store):
     online_score_request = OnlineScoreRequest(**arguments)
-    if online_score_request.is_validate():
+    if is_admin:
         code = OK
-        if is_admin:
-            response = {'score': 42}
-        else:
-            attrs = online_score_request.get_data()
-
-            score = get_score(store, **attrs)
-            response = {'score': score}
+        response = {'score': 42}
+    elif online_score_request.is_valid():
+        code = OK
+        attrs = online_score_request.get_data()
+        score = get_score(store, **attrs)
+        response = {'score': score}
     else:
         code = INVALID_REQUEST
         response = online_score_request.get_errors()
@@ -321,7 +316,7 @@ def online_score_handler(arguments, is_admin, ctx, store):
 
 def clients_interests_handler(arguments, is_admin, ctx, store):
     clients_interests_request = ClientsInterestsRequest(**arguments)
-    if clients_interests_request.is_validate():
+    if clients_interests_request.is_valid():
         code = OK
         response = {}
         for client_id in clients_interests_request.client_ids.value:
@@ -339,7 +334,7 @@ def method_handler(request, ctx, store):
     }
     body = request['body']
     method_request = MethodRequest(**body)
-    if method_request.is_validate():
+    if method_request.is_valid():
         if check_auth(method_request):
             if method_request.method.value in handler_router:
                 response, code = handler_router[method_request.method.value](

@@ -11,7 +11,9 @@ from optparse import OptionParser
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import re
 from scoring import get_score, get_interests
+from store import Store
 
+PORT = 8081
 SALT = "Otus"
 ADMIN_LOGIN = "admin"
 ADMIN_SALT = "42"
@@ -36,6 +38,8 @@ GENDERS = {
     MALE: "male",
     FEMALE: "female",
 }
+DEFAULT_CACHE_CLIENT = 'memcache'
+DEFAULT_CACHE_ADDRESS = '127.0.0.1'
 
 
 class BaseField(object):
@@ -62,7 +66,7 @@ class BaseField(object):
         return self.__str__() + str(other)
 
     def __str__(self):
-        return str(self.value)
+        return self.value
 
     def __set__(self, instance, value):
         self._restore_errors()
@@ -71,7 +75,7 @@ class BaseField(object):
     def validate(self):
         if self.value is None:
             self.clean_required()
-        elif not self.value:
+        elif not self.value and type(self.value) is not int:
             self.clean_nullable()
         else:
             self.clean()
@@ -98,6 +102,8 @@ class CharField(BaseField):
     def clean(self):
         if not isinstance(self.value, basestring):
             self.errors.append(self.char_error)
+        else:
+            self.value = self.value.encode()
 
 
 class ArgumentsField(BaseField):
@@ -123,7 +129,13 @@ class PhoneField(BaseField):
     phone_template = r"7\d{10}"
 
     def clean(self):
-        if not re.match(self.phone_template, self.value):
+        value = self.value
+        if isinstance(value, int):
+            value = str(value)
+        if isinstance(value, basestring):
+            if not re.match(self.phone_template, value):
+                self.errors.append(self.phone_error)
+        else:
             self.errors.append(self.phone_error)
 
 
@@ -132,8 +144,9 @@ class DateField(BaseField):
 
     def clean(self):
         try:
-            datetime.datetime.strptime(self.value, '%d.%m.%Y')
-        except ValueError:
+            date_string = self.value
+            self.value = datetime.datetime.strptime(date_string, '%d.%m.%Y').date()
+        except (ValueError, TypeError):
             self.errors.append(self.data_error)
 
 
@@ -143,10 +156,10 @@ class BirthDayField(DateField):
     def clean(self):
         super(BirthDayField, self).clean()
         try:
-            birthday = datetime.datetime.strptime(self.value, '%d.%m.%Y')
-            if birthday < datetime.datetime.now() - datetime.timedelta(days=365*70):
+            # birthday = datetime.datetime.strptime(self.value, '%d.%m.%Y')
+            if self.value < datetime.datetime.now().date() - datetime.timedelta(days=365*70):
                 self.errors.append(self.birthday_error)
-        except ValueError:
+        except (ValueError, TypeError):
             pass
 
 
@@ -154,12 +167,8 @@ class GenderField(BaseField):
     gender_error = 'is not a gender number'
 
     def clean(self):
-        try:
-            int(self.value)
-        except ValueError:
-            self.errors.append(self.gender_error)
-        if self.value not in (UNKNOWN, MALE, FEMALE):
-            self.errors.append(self.gender_error)
+        if not isinstance(self.value, int) or self.value not in (UNKNOWN, MALE, FEMALE):
+                self.errors.append(self.gender_error)
 
 
 class ClientIDsField(BaseField):
@@ -168,6 +177,11 @@ class ClientIDsField(BaseField):
     def clean(self):
         if not isinstance(self.value, list):
             self.errors.append(self.client_id_error)
+        else:
+            for element in self.value:
+                if not isinstance(element, int):
+                    self.errors.append(self.client_id_error)
+                    break
 
 
 class BaseRequest(object):
@@ -259,7 +273,8 @@ class OnlineScoreRequest(BaseRequest):
         for attr_name in dir(self):
             attr = getattr(self, attr_name)
             if isinstance(attr, BaseField):
-                self.not_null_fields.append(attr_name)
+                if attr.value is not None:
+                    self.not_null_fields.append(attr_name)
 
 
 class MethodRequest(BaseRequest):
@@ -325,7 +340,10 @@ def clients_interests_handler(arguments, is_admin, ctx, store):
             response[client_id] = get_interests(store, client_id)
     else:
         response, code = clients_interests_request.get_errors(), INVALID_REQUEST
-    ctx['nclients'] = len(clients_interests_request.client_ids.value)
+    try:
+        ctx['nclients'] = len(clients_interests_request.client_ids.value)
+    except TypeError:
+        ctx['nclients'] = 0
     return response, code
 
 
@@ -354,58 +372,64 @@ def method_handler(request, ctx, store):
     return response, code
 
 
-class MainHTTPHandler(BaseHTTPRequestHandler):
-    router = {
-        "method": method_handler,
-    }
-    store = None
+def make_handler_class(opts):
+    class MainHTTPHandler(BaseHTTPRequestHandler):
+        router = {
+            "method": method_handler,
+        }
+        store = Store(opts.cache_type, opts.cache_address, opts.cache_port)
 
-    def get_request_id(self, headers):
-        return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)
+        def get_request_id(self, headers):
+            return headers.get('HTTP_X_REQUEST_ID', uuid.uuid4().hex)
 
-    def do_POST(self):
-        response, code = {}, OK
-        context = {"request_id": self.get_request_id(self.headers)}
-        request = None
-        try:
-            data_string = self.rfile.read(int(self.headers['Content-Length']))
-            request = json.loads(data_string)
-        except Exception as e:
-            print e
-            code = BAD_REQUEST
+        def do_POST(self):
+            response, code = {}, OK
+            context = {"request_id": self.get_request_id(self.headers)}
+            request = None
+            try:
+                data_string = self.rfile.read(int(self.headers['Content-Length']))
+                request = json.loads(data_string)
+            except Exception as e:
+                print e
+                code = BAD_REQUEST
 
-        if request:
-            path = self.path.strip("/")
-            logging.info("%s: %s %s" % (self.path, data_string, context["request_id"]))
-            if path in self.router:
-                try:
-                    response, code = self.router[path]({"body": request, "headers": self.headers}, context, self.store)
-                except Exception, e:
-                    logging.exception("Unexpected error: %s" % e)
-                    code = INTERNAL_ERROR
+            if request:
+                path = self.path.strip("/")
+                logging.info("%s: %s %s" % (self.path, data_string, context["request_id"]))
+                if path in self.router:
+                    try:
+                        response, code = self.router[path]({"body": request, "headers": self.headers}, context, self.store)
+                    except Exception, e:
+                        logging.exception("Unexpected error: %s" % e)
+                        code = INTERNAL_ERROR
+                else:
+                    code = NOT_FOUND
+
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            if code not in ERRORS:
+                r = {"response": response, "code": code}
             else:
-                code = NOT_FOUND
-
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        if code not in ERRORS:
-            r = {"response": response, "code": code}
-        else:
-            r = {"error": response or ERRORS.get(code, "Unknown Error"), "code": code}
-        context.update(r)
-        logging.info(context)
-        self.wfile.write(json.dumps(r))
-        return
+                r = {"error": response or ERRORS.get(code, "Unknown Error"), "code": code}
+            context.update(r)
+            logging.info(context)
+            self.wfile.write(json.dumps(r))
+            return
+    return MainHTTPHandler
 
 
 if __name__ == "__main__":
     op = OptionParser()
-    op.add_option("-p", "--port", action="store", type=int, default=8081)
+    op.add_option("-p", "--port", action="store", type=int, default=PORT)
+    op.add_option("-c", "--cache_address", action="store", default=DEFAULT_CACHE_ADDRESS)
+    op.add_option("-k", "--cache_type", action="store", default=DEFAULT_CACHE_CLIENT)
+    op.add_option("--cache_port", action="store", default=11211)
     op.add_option("-l", "--log", action="store", default=None)
     (opts, args) = op.parse_args()
     logging.basicConfig(filename=opts.log, level=logging.INFO,
                         format='[%(asctime)s] %(levelname).1s %(message)s', datefmt='%Y.%m.%d %H:%M:%S')
+    MainHTTPHandler = make_handler_class(opts)
     server = HTTPServer(("localhost", opts.port), MainHTTPHandler)
     logging.info("Starting server at %s" % opts.port)
     try:

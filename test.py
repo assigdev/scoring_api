@@ -2,6 +2,16 @@ import unittest
 import api
 
 
+def cases(case_list):
+    def decorator(func):
+        def wrapper(self):
+            for case in case_list:
+                func(self, case)
+            return
+        return wrapper
+    return decorator
+
+
 class BaseFieldTestCase(unittest.TestCase):
     def setUp(self):
         class ChildBaseField(api.BaseField):
@@ -70,397 +80,242 @@ class BaseFieldTestCase(unittest.TestCase):
 
 class CharFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        'test text',
+        's'
+    ])
+    def test_valid_value(self, case):
         field = api.CharField(required=True, nullable=False)
-        field.__set__(field, 'test text')
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_dict(self):
+    @cases([
+        ({'key': 'value'}, 'Is not a string'),
+        (100, 'Is not a string'),
+        (('string',), 'Is not a string'),
+        ([1, 2, 3], 'Is not a string'),
+        ({}, 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.CharField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
+        field.__set__(field, value)
         field.validate()
-        self.assertEquals(field.errors, ['Is not a string'])
-
-    def test_value_with_int(self):
-        field = api.CharField(required=True, nullable=False)
-        field.__set__(field, 1)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not a string'])
-
-    def test_value_with_list(self):
-        field = api.CharField(required=True, nullable=False)
-        field.__set__(field, [1])
-        field.validate()
-        self.assertEquals(field.errors, ['Is not a string'])
+        self.assertEquals(field.errors, [error])
 
 
 class ArgumentsFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        {'test_key': 'test_value'},
+        {'test_key': 'test_value', 'key2': 'value2'}
+    ])
+    def test_valid_value(self, case):
         field = api.ArgumentsField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['Is not dict with arguments'])
-
-    def test_value_with_dict(self):
-        field = api.ArgumentsField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_int(self):
+    @cases([
+        ('string', 'Is not dict with arguments'),
+        (100, 'Is not dict with arguments'),
+        (('string',), 'Is not dict with arguments'),
+        ([1, 2, 3], 'Is not dict with arguments'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.ArgumentsField(required=True, nullable=False)
-        field.__set__(field, 1)
+        field.__set__(field, value)
         field.validate()
-        self.assertEquals(field.errors, ['Is not dict with arguments'])
-
-    def test_value_with_list(self):
-        field = api.ArgumentsField(required=True, nullable=False)
-        field.__set__(field, [1])
-        field.validate()
-        self.assertEquals(field.errors, ['Is not dict with arguments'])
+        self.assertEquals(field.errors, [error])
 
 
 class EmailFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        'testmail@mail.ru',
+        'gmail@gmail.com',
+    ])
+    def test_valid_value(self, case):
         field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['Is not email'])
-
-    def test_value_with_dict(self):
-        field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
-        field.validate()
-        self.assertEquals(field.errors, ['Is not a string'])
-
-    def test_value_with_int(self):
-        field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, 1)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not a string'])
-
-    def test_value_with_list(self):
-        field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, [1])
-        field.validate()
-        self.assertEquals(field.errors, ['Is not a string'])
-
-    def test_value_with_email(self):
-        field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, 'tester@gmail.com')
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_bad_email(self):
+    @cases([
+        ('string', 'Is not email'),
+        ('mail.ru', 'Is not email'),
+        (100, 'Is not a string'),
+        (('string',), 'Is not a string'),
+        ([1, 2, 3], 'Is not a string'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, 'testergmail.com')
+        field.__set__(field, value)
         field.validate()
-        self.assertEquals(field.errors, ['Is not email'])
+        self.assertEquals(field.errors, [error])
 
 
 class PhoneFieldTestCase(unittest.TestCase):
-
-    def test_value_with_string(self):
+    @cases([
+        '79634261358',
+        79634261358,
+    ])
+    def test_valid_value(self, case):
         field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_with_dict(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_with_int(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, 1)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_with_list(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, [1])
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_is_true_phone(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, 79644261355)
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_is_true_phone_2(self):
+    @cases([
+        ('8999934222224', 'Is not phone number'),
+        ('7963426135_', 'Is not phone number'),
+        (796342613.5, 'Is not phone number'),
+        ([1, 2, 3], 'Is not phone number'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, '79644261355')
+        field.__set__(field, value)
         field.validate()
-        self.assertFalse(field.errors)
-
-    def test_value_is_false_phone(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, 7964426135)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_is_false_phone_2(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, '89634261355')
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_is_false_phone_3(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, '7963426135_')
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_is_false_phone_4(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, 7963426.1355)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
-
-    def test_value_is_false_phone_5(self):
-        field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, 79634261355.5)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not phone number'])
+        self.assertEquals(field.errors, [error])
 
 
 class DateFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        '30.01.2017',
+        '1.2.2017',
+    ])
+    def test_valid_value(self, case):
         field = api.DateField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_dict(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_int(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, 1)
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_list(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, [1])
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_date(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, '30.01.2017')
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_date_2(self):
+    @cases([
+        ('01.02.17', 'Is note date'),
+        ('1.2.17', 'Is note date'),
+        ('10.2017', 'Is note date'),
+        ('2017.2017.2017', 'Is note date'),
+        (10.2017, 'Is note date'),
+        ([1, 2, 3], 'Is note date'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.DateField(required=True, nullable=False)
-        field.__set__(field, '1.2.2017')
+        field.__set__(field, value)
         field.validate()
-        self.assertFalse(field.errors)
-
-    def test_value_with_bad_date(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, '1.2.17')
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_bad_date_2(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, '01.02.17')
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_bad_date_3(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, '2017.2017.2017')
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_bad_date_4(self):
-        field = api.DateField(required=True, nullable=False)
-        field.__set__(field, '10.2017')
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
+        self.assertEquals(field.errors, [error])
 
 
 class BirthDayFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        '30.01.2017',
+        '30.12.1948',
+    ])
+    def test_valid_value(self, case):
         field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_dict(self):
-        field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_int(self):
-        field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, 1)
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_list(self):
-        field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, [1])
-        field.validate()
-        self.assertEquals(field.errors, ['Is note date'])
-
-    def test_value_with_true_birthday(self):
-        field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, '30.01.2017')
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_true_birthday_2(self):
+    @cases([
+        ('01.02.1947', 'Not a birthday'),
+        ('01.02.1000', 'Not a birthday'),
+        ('1.2.17', 'Is note date'),
+        ('10.2017', 'Is note date'),
+        ('2017.2017.2017', 'Is note date'),
+        (10.2017, 'Is note date'),
+        ([1, 2, 3], 'Is note date'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, '30.12.1948')
+        field.__set__(field, value)
         field.validate()
-        self.assertFalse(field.errors)
-
-    def test_value_with_false_birthday(self):
-        field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, '25.12.1947')
-        field.validate()
-        self.assertEquals(field.errors, ['Not a birthday'])
+        self.assertEquals(field.errors, [error])
 
 
 class GenderFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        2,
+        1,
+        0,
+    ])
+    def test_valid_value(self, case):
         field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['is not a gender number'])
-
-    def test_value_with_dict(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
-        field.validate()
-        self.assertEquals(field.errors, ['is not a gender number'])
-
-    def test_value_with_int(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, 2)
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_list(self):
+    @cases([
+        (3, 'is not a gender number'),
+        ('3', 'is not a gender number'),
+        ('01.02.1947', 'is not a gender number'),
+        ('test text', 'is not a gender number'),
+        ('1.2.17', 'is not a gender number'),
+        ({'test_key': 'test_value'}, 'is not a gender number'),
+        ([1], 'is not a gender number'),
+        (10.2017, 'is not a gender number'),
+        ([1, 2, 3], 'is not a gender number'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, [1])
+        field.__set__(field, value)
         field.validate()
-        self.assertEquals(field.errors, ['is not a gender number'])
-
-    def test_value_with_true_gender(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, 0)
-        field.validate()
-        self.assertFalse(field.errors)
-
-    def test_value_with_true_gender_2(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, 1)
-        field.validate()
-        self.assertFalse(field.errors)
-
-    def test_value_with_false_gender(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, '3')
-        field.validate()
-        self.assertEquals(field.errors, ['is not a gender number'])
-
-    def test_value_with_false_gender_2(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, 3)
-        field.validate()
-        self.assertEquals(field.errors, ['is not a gender number'])
-
-    def test_value_with_false_gender_3(self):
-        field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, 4)
-        field.validate()
-        self.assertEquals(field.errors, ['is not a gender number'])
+        self.assertEquals(field.errors, [error])
 
 
 class ClientIDsFieldTestCase(unittest.TestCase):
 
-    def test_value_with_string(self):
+    @cases([
+        [2],
+        [1, 3, 5, 6],
+        [0],
+    ])
+    def test_valid_value(self, case):
         field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, 'test text')
-        field.validate()
-        self.assertEquals(field.errors, ['Is not list of client ids'])
-
-    def test_value_with_dict(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, {'test_key': 'test_value'})
-        field.validate()
-        self.assertEquals(field.errors, ['Is not list of client ids'])
-
-    def test_value_with_int(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, 2)
-        field.validate()
-        self.assertEquals(field.errors, ['Is not list of client ids'])
-
-    def test_value_with_list(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, [1])
+        field.__set__(field, case)
         field.validate()
         self.assertFalse(field.errors)
 
-    def test_value_with_true_gender(self):
+    @cases([
+        ([1, [2, 3]], 'Is not list of client ids'),
+        (3, 'Is not list of client ids'),
+        ('3', 'Is not list of client ids'),
+        ('01.02.1947', 'Is not list of client ids'),
+        ('test text', 'Is not list of client ids'),
+        ('1.2.17', 'Is not list of client ids'),
+        ({'test_key': 'test_value'}, 'Is not list of client ids'),
+        (10.2017, 'Is not list of client ids'),
+        ({}, 'is not nullable'),
+        ((), 'is not nullable'),
+        ([], 'is not nullable'),
+    ])
+    def test_invalid_value_(self, case):
+        value, error = case
         field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, [1, 2, 10, 3, 4, 5, 6, 90])
+        field.__set__(field, value)
         field.validate()
-        self.assertFalse(field.errors)
-
-    def test_value_with_false_gender(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, [])
-        field.validate()
-        self.assertEquals(field.errors, ['is not nullable'])
-
-    def test_value_with_false_gender_2(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, [3, '3', '44'])
-        field.validate()
-        self.assertEquals(field.errors, ['Is not list of client ids'])
-
-    def test_value_with_false_gender_3(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, [1, [12, 3]])
-        field.validate()
-        self.assertEquals(field.errors, ['Is not list of client ids'])
-
-    def test_value_with_false_gender_4(self):
-        field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, (1,))
-        field.validate()
-        self.assertEquals(field.errors, ['Is not list of client ids'])
-
-
-def cases(case_list):
-    def decorator(func):
-        def wrapper(self):
-            result = []
-            for case in case_list:
-                result.append(func(self, case))
-            return result
-        return wrapper
-    return decorator
+        self.assertEquals(field.errors, [error])
 
 
 class TestSuite(unittest.TestCase):

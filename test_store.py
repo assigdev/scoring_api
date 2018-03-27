@@ -52,9 +52,10 @@ class RedisTestCase(unittest.TestCase):
         self.assertEqual(self.store.cache_get('key_none'), None)
 
 
-class WrongMemcacheTestCase(unittest.TestCase):
+class CloseConnectionMemcacheTestCase(unittest.TestCase):
     def setUp(self):
-        self.wrong_store = store.Store('memcache', '127.0.0.1', 12222)
+        self.wrong_store = store.Store('memcache')
+        self.wrong_store.client.connection.buckets.pop()
 
     def test_cache_set(self):
         self.assertEqual(self.wrong_store.cache_set('key', 'value', 60), 0)
@@ -69,9 +70,10 @@ class WrongMemcacheTestCase(unittest.TestCase):
         self.assertIsNone(self.wrong_store.cache_get('key_get'))
 
 
-class WrongRedisTestCase(unittest.TestCase):
+class CloseConnectionRedisTestCase(unittest.TestCase):
     def setUp(self):
-        self.wrong_store = store.Store('redis', '127.0.0.1', 12222)
+        self.wrong_store = store.Store('redis')
+        self.wrong_store.client.connection.shutdown()
 
     def test_cache_set(self):
         self.assertEqual(self.wrong_store.cache_set('key', 'value', 60), 0)
@@ -84,7 +86,6 @@ class WrongRedisTestCase(unittest.TestCase):
 
     def test_cache_get(self):
         self.assertIsNone(self.wrong_store.cache_get('key_get'))
-
 
 
 if __name__ == "__main__":

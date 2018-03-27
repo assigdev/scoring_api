@@ -7,10 +7,6 @@ REDIS_PORT = 6379
 RETRY_COUNT = 4
 
 
-class CacheReadingError(Exception):
-    pass
-
-
 class Store(object):
     def __init__(self, client_type, address='127.0.0.1', port=None, timeout=20):
         clients = {
@@ -25,14 +21,14 @@ class Store(object):
         if value is None:
             for _ in range(self.retry_count):
                 value = self.client.get(key)
-                if value:
+                if value is not None:
                     break
         return value
 
     def get(self, key):
         value = self._get(key)
         if value is None:
-            raise CacheReadingError('Cache Reading Error')
+            raise IOError('Cache Reading Error')
         return value
 
     def cache_get(self, key):
@@ -66,6 +62,16 @@ class MemCacheClient(object):
         return self.connection.set(key, value, time)
 
 
+def test_connection(func):
+    def deco(self, *args):
+        if self.connection is None:
+            self.connection = self.get_connection()
+            if self.connection is None:
+                return None
+        return func(self, *args)
+    return deco
+
+
 class RedisClient(object):
     def __init__(self, ip_address, port, timeout):
         self.port = port or REDIS_PORT
@@ -79,24 +85,16 @@ class RedisClient(object):
         except redis.ConnectionError:
             return None
 
-    def test_connection(self):
-        if self.connection is None:
-            self.connection = self.get_connection()
-            if self.connection is None:
-                return False
-        else:
-            return True
-
+    @test_connection
     def get(self, key):
-        if self.test_connection():
-            try:
-                return self.connection.get(key)
-            except redis.ConnectionError:
-                return None
+        try:
+            return self.connection.get(key)
+        except redis.ConnectionError:
+            return None
 
+    @test_connection
     def set(self, key, value, time):
-        if self.test_connection():
-            try:
-                return self.connection.set(key, value, ex=time)
-            except redis.ConnectionError:
-                return 0
+        try:
+            return self.connection.set(key, value, ex=time)
+        except redis.ConnectionError:
+            return 0

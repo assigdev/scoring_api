@@ -1,12 +1,19 @@
 import unittest
 import api
+import functools
 
 
 def cases(case_list):
     def decorator(func):
-        def wrapper(self):
+        @functools.wraps(func)
+        def wrapper(*args):
             for case in case_list:
-                func(self, case)
+                new_args = args + (case,)
+                try:
+                    func(*new_args)
+                except AssertionError:
+                    print "Error in case: %s" % (case,)
+                    raise
             return
         return wrapper
     return decorator
@@ -23,59 +30,44 @@ class BaseFieldTestCase(unittest.TestCase):
                     self.errors.append(self.child_error)
         self.field_class = ChildBaseField
 
-    def test_require_is_true(self):
-        field = self.field_class(required=True)
+    @cases([
+        (True, ['is require']),
+        (False, []),
+    ])
+    def test_require(self, case):
+        required, error = case
+        field = self.field_class(required=required)
         field._restore_errors()
         field.validate()
-        self.assertEqual(field.errors, ['is require'])
+        self.assertEqual(field.errors, error)
 
-    def test_require_is_false(self):
-        field = self.field_class(required=False)
-        field._restore_errors()
-        field.is_error = False
+    @cases([
+        (False, [], ['is not nullable']),
+        (False, False, ['is not nullable']),
+        (False, '', ['is not nullable']),
+        (True, [], []),
+        (True, False, []),
+        (True, '', []),
+    ])
+    def test_nullable(self, case):
+        nullable, value, error = case
+        field = self.field_class(required=False, nullable=nullable)
+        field.value = value
         field.validate()
-        self.assertFalse(field.errors)
+        self.assertEqual(field.errors, error)
 
-    def test_nullable_is_false(self):
-        field = self.field_class(required=False, nullable=False)
-        field.__set__(field, [])
-        field.validate()
-        self.assertEqual(field.errors, ['is not nullable'])
-        field.__set__(field, False)
-        field.validate()
-        self.assertEqual(field.errors, ['is not nullable'])
-        field.__set__(field, '')
-        field.validate()
-        self.assertEqual(field.errors, ['is not nullable'])
-
-    def test_nullable_is_true(self):
+    @cases([
+        (True, ['have error']),
+        (False, []),
+    ])
+    def test_clean_method_error(self, case):
+        status, error = case
         field = self.field_class(required=False, nullable=True)
-        field.is_error = False
-        field.__set__(field, [])
-        field.validate()
-        self.assertFalse(field.errors)
-        field.__set__(field, False)
-        field.validate()
-        self.assertFalse(field.errors)
-        field.__set__(field, '')
-        field.validate()
-        self.assertFalse(field.errors)
-
-    def test_clean_method_error_is_false(self):
-        field = self.field_class(required=False, nullable=True)
-        field.is_error = False
+        field.is_error = status
         field._restore_errors()
         field.value = 'test_text'
         field.validate()
-        self.assertFalse(field.errors)
-
-    def test_clean_method_error_is_true(self):
-        field = self.field_class(required=False, nullable=True)
-        field.is_error = True
-        field._restore_errors()
-        field.value = 'test_text'
-        field.validate()
-        self.assertEqual(field.errors, ['have error'])
+        self.assertEqual(field.errors, error)
 
 
 class CharFieldTestCase(unittest.TestCase):
@@ -86,7 +78,7 @@ class CharFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.CharField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -100,7 +92,7 @@ class CharFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.CharField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -113,7 +105,7 @@ class ArgumentsFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.ArgumentsField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -128,7 +120,7 @@ class ArgumentsFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.ArgumentsField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -141,7 +133,7 @@ class EmailFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -157,7 +149,7 @@ class EmailFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.EmailField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -169,7 +161,7 @@ class PhoneFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -184,7 +176,7 @@ class PhoneFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.PhoneField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -197,7 +189,7 @@ class DateFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.DateField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -214,7 +206,7 @@ class DateFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.DateField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -227,7 +219,7 @@ class BirthDayFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -245,7 +237,7 @@ class BirthDayFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.BirthDayField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -259,7 +251,7 @@ class GenderFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -279,7 +271,7 @@ class GenderFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.GenderField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 
@@ -293,7 +285,7 @@ class ClientIDsFieldTestCase(unittest.TestCase):
     ])
     def test_valid_value(self, case):
         field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, case)
+        field.value = case
         field.validate()
         self.assertFalse(field.errors)
 
@@ -313,7 +305,7 @@ class ClientIDsFieldTestCase(unittest.TestCase):
     def test_invalid_value_(self, case):
         value, error = case
         field = api.ClientIDsField(required=True, nullable=False)
-        field.__set__(field, value)
+        field.value = value
         field.validate()
         self.assertEquals(field.errors, [error])
 

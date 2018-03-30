@@ -69,10 +69,10 @@ class BaseField(object):
         return self.value
 
     def __set__(self, instance, value):
-        self._restore_errors()
         self.value = value
 
     def validate(self):
+        self._restore_errors()
         if self.value is None:
             self.clean_required()
         elif not self.value and type(self.value) is not int:
